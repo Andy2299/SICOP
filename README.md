@@ -56,6 +56,8 @@ La hoja debe contener los siguientes encabezados:
 
 - Conexión directa a Google Sheets (URL o ID).
 - Filtros por tipo de procedimiento, institución y rango de fechas.
+  - Si la hoja incluye una columna de nombre de institución (`NOMBRE_INSTITUCION`, `INSTITUCION`, `NOMBRE_ENTIDAD` o `NOMBRE_INSTITUCION_PUBLICA`), el filtro se muestra por nombre y se presenta la relación institución ↔ cédula.
+  - Si no existe una columna de nombre, el filtro continúa por cédula.
 - KPIs principales.
 - Gráficos de distribución y evolución temporal.
 - Exportación de datos filtrados a CSV.

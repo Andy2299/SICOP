@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
 import pandas as pd
@@ -19,7 +20,7 @@ EXPECTED_COLUMNS = [
 ]
 
 
-def extract_sheet_id(url: str) -> str | None:
+def extract_sheet_id(url: str) -> Optional[str]:
     """Extract Google Sheets ID from a full URL or return plain ID if given."""
     text = url.strip()
     id_match = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", text)
@@ -70,10 +71,54 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
     tipo_opts = sorted(df["TIPO_PROCEDIMIENTO"].dropna().unique().tolist())
     tipo_sel = st.sidebar.multiselect("Tipo de procedimiento", tipo_opts, default=tipo_opts)
 
-    inst_opts = sorted(df["CEDULA_INSTITUCION"].dropna().unique().tolist())
-    inst_sel = st.sidebar.multiselect(
-        "Cédula institución", inst_opts, default=inst_opts[: min(20, len(inst_opts))]
-    )
+    name_columns = [
+        "NOMBRE_INSTITUCION",
+        "INSTITUCION",
+        "NOMBRE_ENTIDAD",
+        "NOMBRE_INSTITUCION_PUBLICA",
+    ]
+    institution_name_col = next((col for col in name_columns if col in df.columns), None)
+
+    if institution_name_col:
+        inst_catalog = (
+            df[[institution_name_col, "CEDULA_INSTITUCION"]]
+            .dropna(subset=[institution_name_col])
+            .drop_duplicates()
+            .copy()
+        )
+        inst_catalog = inst_catalog.sort_values(
+            [institution_name_col, "CEDULA_INSTITUCION"], na_position="last"
+        )
+        inst_catalog["inst_label"] = inst_catalog.apply(
+            lambda row: (
+                f"{row[institution_name_col]} ({row['CEDULA_INSTITUCION']})"
+                if pd.notna(row["CEDULA_INSTITUCION"])
+                else str(row[institution_name_col])
+            ),
+            axis=1,
+        )
+        inst_opts = inst_catalog["inst_label"].tolist()
+        inst_sel = st.sidebar.multiselect(
+            "Institución", inst_opts, default=inst_opts
+        )
+
+        if not inst_catalog.empty:
+            st.sidebar.caption("Relación de institución pública y cédula.")
+            st.sidebar.dataframe(
+                inst_catalog.rename(
+                    columns={
+                        institution_name_col: "Institución",
+                        "CEDULA_INSTITUCION": "Cédula",
+                    }
+                )[["Institución", "Cédula"]],
+                use_container_width=True,
+                hide_index=True,
+            )
+    else:
+        inst_opts = sorted(df["CEDULA_INSTITUCION"].dropna().unique().tolist())
+        inst_sel = st.sidebar.multiselect(
+            "Cédula institución", inst_opts, default=inst_opts
+        )
 
     date_min = df["FECHA_PUBLICACION"].min()
     date_max = df["FECHA_PUBLICACION"].max()
@@ -89,7 +134,27 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
     if tipo_sel:
         filtered = filtered[filtered["TIPO_PROCEDIMIENTO"].isin(tipo_sel)]
     if inst_sel:
-        filtered = filtered[filtered["CEDULA_INSTITUCION"].isin(inst_sel)]
+        if institution_name_col:
+            selected_ids = set(
+                inst_catalog.loc[
+                    inst_catalog["inst_label"].isin(inst_sel), "CEDULA_INSTITUCION"
+                ]
+                .dropna()
+                .tolist()
+            )
+            selected_names = set(
+                inst_catalog.loc[
+                    inst_catalog["inst_label"].isin(inst_sel), institution_name_col
+                ]
+                .dropna()
+                .tolist()
+            )
+            filtered = filtered[
+                filtered["CEDULA_INSTITUCION"].isin(selected_ids)
+                | filtered[institution_name_col].isin(selected_names)
+            ]
+        else:
+            filtered = filtered[filtered["CEDULA_INSTITUCION"].isin(inst_sel)]
 
     if date_sel and len(date_sel) == 2:
         start_dt = pd.to_datetime(date_sel[0])
