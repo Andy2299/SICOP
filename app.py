@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
 import pandas as pd
@@ -19,7 +20,7 @@ EXPECTED_COLUMNS = [
 ]
 
 
-def extract_sheet_id(url: str) -> str | None:
+def extract_sheet_id(url: str) -> Optional[str]:
     """Extract Google Sheets ID from a full URL or return plain ID if given."""
     text = url.strip()
     id_match = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", text)
@@ -72,7 +73,7 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
 
     inst_opts = sorted(df["CEDULA_INSTITUCION"].dropna().unique().tolist())
     inst_sel = st.sidebar.multiselect(
-        "Cédula institución", inst_opts, default=inst_opts[: min(20, len(inst_opts))]
+        "Cédula institución", inst_opts, default=inst_opts
     )
 
     date_min = df["FECHA_PUBLICACION"].min()
